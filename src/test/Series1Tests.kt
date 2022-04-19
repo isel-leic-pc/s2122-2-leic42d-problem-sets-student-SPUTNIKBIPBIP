@@ -1,5 +1,4 @@
 package test
-/*
 import mu.KLogger
 import mu.KotlinLogging
 import org.junit.Assert.*
@@ -185,4 +184,3 @@ class Series1Tests {
         assertEquals(expectedSet, resultSet);
     }
 }
-*/
