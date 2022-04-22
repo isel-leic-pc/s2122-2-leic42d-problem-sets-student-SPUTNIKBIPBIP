@@ -1,22 +1,25 @@
 package main
 
+import isel.leic.pc.monitors4.utils.NodeList
 import utils.await
 import utils.dueTime
 import utils.isPast
 import utils.isZero
-import java.util.LinkedList
+import java.security.InvalidParameterException
 import java.util.concurrent.locks.Condition
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.thread
 import kotlin.concurrent.withLock
 import kotlin.time.Duration
 
 class Exchanger<T> {
 
-    class ExchangePair<T> (var thread : Thread ? = null, var value: T ? = null, val isDone: Condition)
+    class ExchangePair<T> (var thread : T ? = null, var value: T ? = null, var isExchanged : Condition ? = null)
 
-    private val list = LinkedList<ExchangePair<T>>()
-    private val mutex = ReentrantLock()
-    private val isExchanged: Condition = mutex.newCondition()
+    private val pairs = NodeList<ExchangePair<T>>()
+    private val monitor = ReentrantLock()
+    private val condition: Condition = monitor.newCondition()
+    private var tvalue : T ? = null
 
     /**
      * @value thread wich will receive the value
@@ -25,29 +28,34 @@ class Exchanger<T> {
      */
     @Throws(InterruptedException::class)
     fun exchange(value: T, timeout: Duration): T? {
-        mutex.withLock {
+        monitor.withLock {
+            if (value == null)
+                throw InvalidParameterException()
             //fast path
-            if (list.isEmpty()) {
-                val thread = value as Thread
-
+            if (pairs.isEmpty) {
+                //how to do the exchange ?!
+                val v : T? = tvalue
+                val thread : Thread = value as Thread
+                thread {
+                    tvalue = v
+                }
             }
             if (timeout.isZero)
                 return null
             val dueTime = timeout.dueTime()
-            val exchangePair = list.removeFirst()
+            val pair = ExchangePair(value, tvalue, condition)
+            pairs.add(pair)
             try {
-                //while value
-                while (value == null)
-                    isExchanged.await(dueTime)
+                while (tvalue == null)
+                    pair.isExchanged?.await(dueTime)
                 if (dueTime.isPast) {
                     return null
                 }
-                value
+                tvalue
             }
             catch(e: InterruptedException) {
                 //set aggain the flag
                 Thread.interrupted()
-
                 throw e
             }
             //to delete after
