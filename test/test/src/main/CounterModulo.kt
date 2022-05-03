@@ -10,8 +10,7 @@ class CounterModulo(private val moduloValue: Int) {
         do {
             val valueRead = value.get()
             if (valueRead != moduloValue - 1) {
-                if (value.compareAndSet(valueRead, valueRead + 1))
-                    return valueRead + 1
+                return value.incrementAndGet()
             } else {
                 if (value.compareAndSet(valueRead, 0))
                     return 0
@@ -23,8 +22,7 @@ class CounterModulo(private val moduloValue: Int) {
         do {
             val valueRead = value.get()
             if (value.get() != 1) {
-                if (value.compareAndSet(valueRead, valueRead - 1))
-                    return valueRead - 1
+                return value.decrementAndGet()
             } else {
                 if (value.compareAndSet(valueRead, moduloValue - 1))
                     return moduloValue - 1

@@ -13,9 +13,10 @@ class UnsafeMessageBox<M> {
         holder = AtomicReference(Holder(msg, lives))
     }
 
+    //TODO: needs some urgent refactory
     fun tryConsume(): M? =
-        val observedValue = holder.get()
-        if (observedValue.lives > 0) {
+        if (holder.get().lives > 0) {
+            val observedValue = holder.get()
             val newValue = Holder(observedValue.msg, observedValue.lives - 1)
             if (holder.compareAndSet(observedValue, newValue)) {
                 observedValue.msg
