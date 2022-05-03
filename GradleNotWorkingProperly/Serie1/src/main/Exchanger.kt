@@ -1,18 +1,6 @@
 package main
 
-import isel.leic.pc.monitors4.utils.NodeList
-import utils.await
-import utils.dueTime
-import utils.isPast
-import utils.isZero
-import java.security.InvalidParameterException
-import java.util.concurrent.locks.Condition
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.thread
-import kotlin.concurrent.withLock
-import kotlin.time.Duration
-
-class Exchanger<T> {
+class CounterModulo<T> {
 
     class ExchangePair<T> (var thread : T ? = null, var value: T ? = null, var isExchanged : Condition ? = null)
 
