@@ -4,13 +4,15 @@ import java.util.concurrent.atomic.AtomicReference
 
 class Lazy<T>(private val initializer: () -> T) {
 
-    @Volatile
-    private var value: AtomicReference<T> ? = AtomicReference<T>(null)
+    private var value = AtomicReference<T>()
 
     fun get() : T {
-        if (value?.get() == null) {
-            return value!!.getAndSet(initializer())
+        val obserValue = value.get()
+
+        if (obserValue == null) {
+            if (value.compareAndSet(obserValue, initializer()))
+                return value.get()
         }
-        return value!!.get()
+        return value.get()
     }
 }

@@ -37,11 +37,21 @@ class Queue<T>() {
         while(true)
     }
 
-    fun poll() : T ? {
+    fun poll() : T? {
         while(true) {
             val currentHead = head.get()
+            val currentTail = tail.get()
             val next = currentHead.next.get()
             if (currentHead == head.get()) {
+                if (currentHead == currentTail) {
+                    if (next == null) {
+                        return null
+                    } else {
+                        //and insertion was made, it's necessary to update the tail
+                        tail.compareAndSet(currentTail, next)
+                    }
+                }
+            } else {
                 if (head.compareAndSet(currentHead, next)) {
                     val item = next?.value
                     next?.value = null
