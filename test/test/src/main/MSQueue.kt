@@ -45,17 +45,17 @@ class MSQueue<T>() {
     fun poll() : T ? {
         while(true) {
             val dummy = head.get()
-            val currentHead = dummy.next.get()
+            val obsFirstElem = dummy.next.get()
             //if next is null, then queue is empty, in this case dummy doesn't have next node
-            val next = currentHead.next.get() ?: return null
-            if (currentHead == dummy.next.get()) {
-                if (dummy.next.compareAndSet(currentHead, next)) {
+            val next = obsFirstElem.next.get() ?: return null
+            if (obsFirstElem == dummy.next.get()) {
+                if (dummy.next.compareAndSet(obsFirstElem, next)) {
                     /*
                     TODO:
                     should i check if another thread has already removed the node, should i worry about it since
                     the cas operation is atomic ?
                      */
-                    val item = currentHead.value
+                    val item = obsFirstElem.value
                     //delete node from queue
                     next.value = null
                     return item
