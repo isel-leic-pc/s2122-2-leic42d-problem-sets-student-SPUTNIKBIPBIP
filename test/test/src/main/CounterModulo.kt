@@ -4,21 +4,24 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class CounterModulo(private val moduloValue: Int) {
 
-    private val value = AtomicInteger(0)
+    val value = AtomicInteger(0)
 
     fun increment(): Int {
         do {
             val valueRead = value.get()
-            if (valueRead != moduloValue - 1) return value.incrementAndGet()
-            if (value.compareAndSet(valueRead, 0)) return 0
+            val nextVal = if (valueRead == moduloValue - 1) 0 else valueRead + 1
+            if (value.compareAndSet(valueRead, nextVal))
+                return nextVal
         } while (true)
     }
 
     fun decrement(): Int {
         do {
             val valueRead = value.get()
-            if (value.get() != 1) return value.decrementAndGet()
-            if (value.compareAndSet(valueRead, moduloValue - 1)) return moduloValue - 1
+            val nextVal = if (valueRead == 0) moduloValue - 1 else valueRead - 1
+            if (value.compareAndSet(valueRead, nextVal)) {
+                return nextVal
+            }
         } while (true)
     }
 }
