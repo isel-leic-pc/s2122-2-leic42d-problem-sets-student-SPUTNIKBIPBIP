@@ -1,8 +1,6 @@
-package main.kotlin.isel.leic.pc.coroutines4.servers
+package isel.leic.pc.coroutines4.servers
 
-import isel.leic.pc.coroutines4.servers.putBuffer
 import kotlinx.coroutines.CancellableContinuation
-import kotlin.coroutines.*
 import kotlinx.coroutines.suspendCancellableCoroutine
 import mu.KotlinLogging
 import java.nio.ByteBuffer
@@ -11,6 +9,8 @@ import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.nio.charset.Charset
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.random.Random
 
 private val random = Random.Default
