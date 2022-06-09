@@ -14,7 +14,7 @@ class Room(name : String) {
         clients.remove(client)
     }
 
-    fun post(client: ConnectedClient, message: String) {
+    suspend fun post(client: ConnectedClient, message: String) {
         val formattedMessage  = "Name: ${client.name} says ${message}"
         clients.forEach { receiver ->
             if (receiver != client)

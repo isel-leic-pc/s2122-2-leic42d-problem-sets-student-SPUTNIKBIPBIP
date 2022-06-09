@@ -5,14 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3652fc40-f256-4da8-aa0d-be603b422871" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Room.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/RoomSet.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Server.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/EchoServerCR.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Room.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Room.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,6 +51,7 @@
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/azeve/Desktop/LEIC/Universidade/2022-SV/PC/Classroom/s2122v-li42d&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;
@@ -89,7 +87,8 @@
       <workItem from="1654683253457" duration="63000" />
       <workItem from="1654683351521" duration="191000" />
       <workItem from="1654683854842" duration="2397000" />
-      <workItem from="1654696851617" duration="5383000" />
+      <workItem from="1654696851617" duration="6278000" />
+      <workItem from="1654767663535" duration="4519000" />
     </task>
     <servers />
   </component>
