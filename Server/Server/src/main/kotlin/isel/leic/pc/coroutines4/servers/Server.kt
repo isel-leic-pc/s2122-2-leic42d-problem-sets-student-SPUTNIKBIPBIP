@@ -8,6 +8,7 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.charset.Charset
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -16,16 +17,21 @@ private val logger = KotlinLogging.logger {}
 private val charSet = Charset.defaultCharset()
 private val decoder = charSet.newDecoder()
 private var currentRoom : Room ? = null
+internal enum class Status {
+    NotStarted, Starting, Started, Ending, Ended
+}
 
 
 class Server(private val port : Int) {
     private val exitCmd = "exit"
     private val byeMsg = "bye" + System.lineSeparator()
     private val semaphore = AsyncSemaphore(5)
-
-    internal enum class Status {
-        NotStarted, Starting, Started, Ending, Ended
-    }
+    @Volatile
+    private var status = Status.NotStarted
+    @Volatile
+    private var nextClientId = 0
+    private val logger = KotlinLogging.logger {}
+    private val rooms = RoomSet()
 
 
     private class ServerScope {
@@ -83,23 +89,37 @@ class Server(private val port : Int) {
         }
     }
 
-    fun run() {
-        suspend fun runInternal() {
-            while(true) {
-                val channel = accept(serverChannel)
-                logger.info("client ${channel.remoteAddress} connected")
+    suspend fun acceptLoop(channel : AsynchronousSocketChannel) {
+        logger.info("Accept thread started")
+        val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
+        status = Status.Started
 
-                // connection handler coroutine
-                scope.launch {
-                    handler(channel)
-                }
+        while (status == Status.Started) {
+            logger.info("Waiting for client")
+            val clientName = "client-${nextClientId++}"
+            logger.info("New client accepted ${clientName}")
+            val client = ConnectedClient(clientName, accept(serverChannel), rooms)
 
-                // to debug purposes
-                //scope.coroutineContext.job.childrenStates()
+            logger.info("client ${channel.remoteAddress} connected")
+
+            // connection handler coroutine
+            scope.launch {
+                handler(channel)
             }
+            clients.add(client)
         }
 
-        serverChannel.bind(InetSocketAddress("0.0.0.0", port))
+        logger.info("Waiting for clients to end, before ending accept loop");
+        clients.forEach { client ->
+            client.exit();
+            client.join();
+        }
+
+        logger.info("Accept thread ending");
+        status = Status.Ended;
+
+        suspend fun runInternal() {
+        }
 
         // accept connections coroutine
         scope.launch {
@@ -115,7 +135,19 @@ class Server(private val port : Int) {
         }
     }
 
+    fun start() {
+        if (status != Status.Started) {
+            throw Exception("Server has already started")
+        }
+        status = Status.Starting
+        serverChannel.bind(InetSocketAddress("0.0.0.0", port))
+        acceptLoop(serverChannel)
+    }
+
     fun stop() {
+        if (status == Status.NotStarted) {
+            throw Exception("Server has not started")
+        }
         serverChannel.close()
         sleep(1000)
         group.shutdown()
@@ -127,7 +159,7 @@ class Server(private val port : Int) {
 
 private fun main() {
     val server = Server(8080)
-    server.run()
+    server.start()
 
     readln()
     server.stop()

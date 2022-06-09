@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class RoomSet {
 
+    //TODO: Usar métodos computeIfAbsent
     private val rooms = ConcurrentHashMap<String, Room>()
 
     fun getOrCreateRoom(name: String) : Room? {
