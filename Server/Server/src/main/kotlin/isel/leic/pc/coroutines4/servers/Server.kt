@@ -16,13 +16,13 @@ import java.util.concurrent.TimeUnit
 private val logger = KotlinLogging.logger {}
 private val charSet = Charset.defaultCharset()
 private val decoder = charSet.newDecoder()
-private var currentRoom : Room ? = null
-internal enum class Status {
-    NotStarted, Starting, Started, Ending, Ended
-}
-
 
 class Server(private val port : Int) {
+
+    internal enum class Status {
+        NotStarted, Starting, Started, Ending, Ended
+    }
+
     private val exitCmd = "exit"
     private val byeMsg = "bye" + System.lineSeparator()
     private val semaphore = AsyncSemaphore(5)
@@ -32,7 +32,7 @@ class Server(private val port : Int) {
     private var nextClientId = 0
     private val logger = KotlinLogging.logger {}
     private val rooms = RoomSet()
-
+    private var currentRoom : Room ? = null
 
     private class ServerScope {
 
@@ -50,65 +50,23 @@ class Server(private val port : Int) {
     // The parent scope to handler coroutines
     private val scope = ServerScope().scope
 
-    suspend fun handler(clientChannel: AsynchronousSocketChannel) {
-
-        suspend fun getMsg() : String {
-            return read(clientChannel)
-        }
-
-        suspend fun  bye() {
-            write(clientChannel, "bye")
-        }
-
-        suspend fun process()  {
-            //semaphore.acquire(1000.toDuration(DurationUnit.MILLISECONDS))
-            logger.info("Start client processing")
-            while(read(clientChannel) > 0) {
-                buffer.flip()
-                logger.info("msg read from ${clientChannel.remoteAddress}")
-                val msg = getMsg()
-                when (msg) {
-
-                    "/exit" -> {
-                        bye()
-                        break
-                    }
-                }
-                write(clientChannel, buffer)
-                logger.info("After echo message")
-            }
-        }
-        try {
-            process()
-        }
-        catch(e: Exception) {
-            println("error on client handler: $e")
-        }
-        finally {
-            closeConnection(clientChannel)
-        }
-    }
-
-    suspend fun acceptLoop(channel : AsynchronousSocketChannel) {
+    private suspend fun acceptLoop(channel : AsynchronousSocketChannel) {
         logger.info("Accept thread started")
         val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
         status = Status.Started
 
         while (status == Status.Started) {
-            logger.info("Waiting for client")
-            val clientName = "client-${nextClientId++}"
-            logger.info("New client accepted ${clientName}")
-            val client = ConnectedClient(clientName, accept(serverChannel), rooms)
-
-            logger.info("client ${channel.remoteAddress} connected")
-
-            // connection handler coroutine
-            scope.launch {
-                handler(channel)
+            try {
+                logger.info("Waiting for client")
+                val clientName = "client-${nextClientId++}"
+                logger.info("New client accepted $clientName")
+                val client = ConnectedClient(clientName, accept(serverChannel), rooms, scope)
+                logger.info("client ${channel.remoteAddress} connected")
+                clients.add(client)
+            } catch (e: Exception) {
+                logger.info("Exception caught ${e.message}, which may happen when the listener is closed, continuing...")
             }
-            clients.add(client)
         }
-
         logger.info("Waiting for clients to end, before ending accept loop");
         clients.forEach { client ->
             client.exit();
@@ -117,14 +75,22 @@ class Server(private val port : Int) {
 
         logger.info("Accept thread ending");
         status = Status.Ended;
+    }
 
-        suspend fun runInternal() {
+    fun start() {
+        suspend fun run() {
+            acceptLoop(accept(serverChannel))
         }
 
-        // accept connections coroutine
+        if (status != Status.NotStarted) {
+            throw Exception("Server has already started")
+        }
+        status = Status.Starting
+        serverChannel.bind(InetSocketAddress("0.0.0.0", port))
+
         scope.launch {
             try {
-                runInternal()
+                run()
             }
             catch(e: Exception) {
                 println("error on accept: terminate server!")
@@ -133,15 +99,6 @@ class Server(private val port : Int) {
                 serverChannel.close()
             }
         }
-    }
-
-    fun start() {
-        if (status != Status.Started) {
-            throw Exception("Server has already started")
-        }
-        status = Status.Starting
-        serverChannel.bind(InetSocketAddress("0.0.0.0", port))
-        acceptLoop(serverChannel)
     }
 
     fun stop() {
@@ -154,14 +111,28 @@ class Server(private val port : Int) {
         group.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
     }
 
+    /* TODO :
+    fun join() {
+        if (status == Status.NotStarted)
+        {
+            logger.info("Server has not started");
+            throw Exception("Server has not started");
+        }
+        // FIXME what if it is starting?
+        if (acceptThread == null)
+        {
+            logger.LogError("Unexpected state: acceptThread is not set");
+            throw new Exception("Unexpected state");
+        }
+        _acceptThread.Join();
+    }*/
+
 }
 
 
 private fun main() {
     val server = Server(8080)
     server.start()
-
-    readln()
-    server.stop()
+    readLine()
     logger.info("Server terminated")
 }

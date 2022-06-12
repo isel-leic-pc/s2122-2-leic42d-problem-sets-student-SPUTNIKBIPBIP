@@ -1,6 +1,9 @@
 package isel.leic.pc.coroutines4.servers
 
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import mu.KotlinLogging
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.ConcurrentHashMap
 
@@ -10,20 +13,65 @@ private abstract class ControlMessage {
     class RoomMessage(val Sender: Room, val Value: String) : ControlMessage()
     class RemoteLine(val Value: String) : ControlMessage()
     class RemoteInputEnded : ControlMessage()
-
-    class Stop : ControlMessage() {
-    }
+    class Stop : ControlMessage()
 }
 
-private var currentRoom : Room ? = null
-private val controlMessageQueue = ConcurrentHashMap.newKeySet<ControlMessage>()
+class ConnectedClient(
+    val name: String,
+    val clientChannel: AsynchronousSocketChannel,
+    val rooms: RoomSet,
+    val scope: CoroutineScope
+) {
 
-class ConnectedClient(val name: String, val clientChannel: AsynchronousSocketChannel, val rooms: RoomSet) {
+    init {
+        scope.launch {
+            mainLoop()
+        }
+    }
 
     private var exiting : Boolean = false
+    private val logger = KotlinLogging.logger {}
+    private var currentRoom : Room ? = null
+    @Volatile
+    private var currentMessageNumber : Int = 0
+    private val controlMessageQueue : ConcurrentHashMap<Int, ControlMessage> = ConcurrentHashMap()
+    private suspend fun mainLoop() {
+        scope.launch {
+            remoteReadLoop()
+        }
+        while (!exiting) {
+            try {
+                var controlMessage = controlMessageQueue[currentMessageNumber--]
+                when (controlMessage) {
+                    is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
+                    is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
+                    is ControlMessage.RemoteInputEnded -> clientExit()
+                    is ControlMessage.Stop -> serverExit()
+                    else -> logger.info("Unknown message ${controlMessage}, ignoring it")
+                }
+            } catch (e: Exception) {
+                logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
+                exiting = true
+            }
+        }
+    }
 
-
-    //TODO: get access to clientChannel refactor server start
+    private suspend fun remoteReadLoop() {
+        try {
+            while (!exiting) {
+                var line = read(clientChannel)
+                controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteLine(line))
+            }
+        } catch (e: Exception) {
+            // Unexpected exception, log and exit
+            logger.info("Exception while waiting for connection read: ${e.message}")
+        } finally {
+            if (!exiting) {
+                controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteInputEnded());
+            }
+        }
+        logger.info("Exiting ReadLoop");
+    }
     suspend fun postRoomMessage(formattedMessage: String, room: Room) {
         if (currentRoom != null) {
             write(clientChannel, "Need to be inside a room to post a message")
@@ -41,7 +89,7 @@ class ConnectedClient(val name: String, val clientChannel: AsynchronousSocketCha
     }
 
     fun exit() {
-        controlMessageQueue.add(ControlMessage.Stop())
+        controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.Stop())
     }
 
     // Synchronizes with the client termination
@@ -49,11 +97,14 @@ class ConnectedClient(val name: String, val clientChannel: AsynchronousSocketCha
     }
 
     private suspend fun writeToRemote(line: String) {
-        write(clientChannel, "Need to be inside a room to post a message")
+        write(clientChannel, line)
     }
-
-    private suspend fun writeErrorToRemote(string line) => writeToRemote($"[Error: {line}]");
-    private suspend fun writeOkToRemote() => writeToRemote("[OK]");
+    private suspend fun writeErrorToRemote(line: String) {
+        writeToRemote("[Error: ${line}]")
+    }
+    private suspend fun writeOkToRemote() {
+        writeToRemote("[OK]")
+    }
 
     suspend fun executeCommand(lineText: String) {
         val line = Line.parse(lineText)
@@ -67,34 +118,34 @@ class ConnectedClient(val name: String, val clientChannel: AsynchronousSocketCha
         }
     }
 
-    private fun enterRoom(name: String) {
+    private suspend fun enterRoom(name: String) {
         currentRoom?.leave(this)
         currentRoom = rooms.getOrCreateRoom(name)
         currentRoom?.enter(this)
         writeOkToRemote();
     }
 
-    private fun leaveRoom() {
+    private suspend fun leaveRoom() {
         if (currentRoom == null)
         {
-            WriteErrorToRemote("There is no room to leave from");
+            writeErrorToRemote("There is no room to leave from");
         } else {
-            currentRoom.leave(this)
+            currentRoom?.leave(this)
             currentRoom = null
-            WriteOkToRemote()
+            writeOkToRemote()
         }
     }
 
-    private fun clientExit() {
+    private suspend fun clientExit() {
         currentRoom?.leave(this)
         exiting = true
-        WriteOkToRemote()
+        writeOkToRemote()
     }
 
-    private fun serverExit() {
+    private suspend fun serverExit() {
         currentRoom?.leave(this);
         exiting = true;
-        WriteErrorToRemote("Server is exiting");
+        writeErrorToRemote("Server is exiting");
     }
 
 }
