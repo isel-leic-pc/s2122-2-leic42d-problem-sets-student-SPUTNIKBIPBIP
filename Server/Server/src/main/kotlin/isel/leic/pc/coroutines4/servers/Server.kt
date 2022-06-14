@@ -50,7 +50,7 @@ class Server(private val port : Int) {
     // The parent scope to handler coroutines
     private val scope = ServerScope().scope
 
-    private suspend fun acceptLoop(channel : AsynchronousSocketChannel) {
+    private suspend fun acceptLoop(serverChannel : AsynchronousServerSocketChannel) {
         logger.info("Accept thread started")
         val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
         status = Status.Started
@@ -60,8 +60,18 @@ class Server(private val port : Int) {
                 logger.info("Waiting for client")
                 val clientName = "client-${nextClientId++}"
                 logger.info("New client accepted $clientName")
-                val client = ConnectedClient(clientName, accept(serverChannel), rooms, scope)
-                logger.info("client ${channel.remoteAddress} connected")
+                val clientChannel = accept(serverChannel)
+                logger.info("client ${clientChannel.remoteAddress} connected")
+                val client = ConnectedClient(clientName, clientChannel , rooms)
+                scope.launch {
+                    logger.info("ConnectedClient readLoop initialization")
+                    client.remoteReadLoop()
+                }
+                scope.launch {
+                    logger.info("ConnectedClient mainLoop initialization")
+                    client.mainLoop()
+                }
+                logger.info("client ${clientChannel.remoteAddress} connected")
                 clients.add(client)
             } catch (e: Exception) {
                 logger.info("Exception caught ${e.message}, which may happen when the listener is closed, continuing...")
@@ -79,7 +89,7 @@ class Server(private val port : Int) {
 
     fun start() {
         suspend fun run() {
-            acceptLoop(accept(serverChannel))
+            acceptLoop(serverChannel)
         }
 
         if (status != Status.NotStarted) {

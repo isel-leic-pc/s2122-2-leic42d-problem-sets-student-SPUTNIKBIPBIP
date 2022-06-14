@@ -1,7 +1,9 @@
 package isel.leic.pc.coroutines4.servers
 
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -68,8 +70,8 @@ suspend fun read(channel: AsynchronousSocketChannel, buffer: ByteBuffer): Int {
         cont.invokeOnCancellation {
             channel.close()
         }
-
         channel.read(buffer, cont, readHandler)
+        logger.info("breakpoint")
     }
 }
 
@@ -91,22 +93,25 @@ suspend fun accept(listener : AsynchronousServerSocketChannel):
         cont.invokeOnCancellation {
             listener.close()
         }
-
         listener.accept(cont, acceptHandler)
     }
 }
 
 suspend fun read(clientChannel : AsynchronousSocketChannel) : String {
-    val buffer = ByteBuffer.allocate(256)
+    val buffer = ByteBuffer.allocate(1024)
     read(clientChannel, buffer)
-    return decoder.decode(buffer).toString()
+    return withContext(Dispatchers.IO) {
+        decoder.decode(buffer)
+    }.toString().trim()
 }
 
 suspend fun write(clientChannel : AsynchronousSocketChannel, text : String) {
-    val buffer = CharBuffer.allocate(256)
-    buffer.put(text)
+    val buffer = CharBuffer.allocate(1024)
+    buffer.put(text + "\r\n")
     buffer.flip()
-    val byteBuffer = encoder.encode(buffer)
+    val byteBuffer = withContext(Dispatchers.IO) {
+        encoder.encode(buffer)
+    }
     write(clientChannel, byteBuffer)
 }
 

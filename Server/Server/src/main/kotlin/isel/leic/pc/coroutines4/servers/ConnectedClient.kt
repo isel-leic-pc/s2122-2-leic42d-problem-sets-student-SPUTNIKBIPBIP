@@ -2,10 +2,12 @@ package isel.leic.pc.coroutines4.servers
 
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 
 
 private abstract class ControlMessage {
@@ -19,15 +21,10 @@ private abstract class ControlMessage {
 class ConnectedClient(
     val name: String,
     val clientChannel: AsynchronousSocketChannel,
-    val rooms: RoomSet,
-    val scope: CoroutineScope
+    val rooms: RoomSet
 ) {
 
-    init {
-        scope.launch {
-            mainLoop()
-        }
-    }
+
 
     private var exiting : Boolean = false
     private val logger = KotlinLogging.logger {}
@@ -35,12 +32,11 @@ class ConnectedClient(
     @Volatile
     private var currentMessageNumber : Int = 0
     private val controlMessageQueue : ConcurrentHashMap<Int, ControlMessage> = ConcurrentHashMap()
-    private suspend fun mainLoop() {
-        scope.launch {
-            remoteReadLoop()
-        }
+    private val lock = ReentrantLock()
+    suspend fun mainLoop() {
         while (!exiting) {
             try {
+                //todo: if control message is empty -> delay
                 var controlMessage = controlMessageQueue[currentMessageNumber--]
                 when (controlMessage) {
                     is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
@@ -56,10 +52,11 @@ class ConnectedClient(
         }
     }
 
-    private suspend fun remoteReadLoop() {
+    suspend fun remoteReadLoop() {
         try {
             while (!exiting) {
                 var line = read(clientChannel)
+                print(line)
                 controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteLine(line))
             }
         } catch (e: Exception) {
@@ -67,10 +64,10 @@ class ConnectedClient(
             logger.info("Exception while waiting for connection read: ${e.message}")
         } finally {
             if (!exiting) {
-                controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteInputEnded());
+                controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteInputEnded())
             }
         }
-        logger.info("Exiting ReadLoop");
+        logger.info("Exiting ReadLoop")
     }
     suspend fun postRoomMessage(formattedMessage: String, room: Room) {
         if (currentRoom != null) {
@@ -94,6 +91,7 @@ class ConnectedClient(
 
     // Synchronizes with the client termination
     fun join() {
+
     }
 
     private suspend fun writeToRemote(line: String) {
@@ -106,7 +104,7 @@ class ConnectedClient(
         writeToRemote("[OK]")
     }
 
-    suspend fun executeCommand(lineText: String) {
+    private suspend fun executeCommand(lineText: String) {
         val line = Line.parse(lineText)
         when (line){
             is Line.InvalidLine -> writeErrorToRemote(line.reason)
