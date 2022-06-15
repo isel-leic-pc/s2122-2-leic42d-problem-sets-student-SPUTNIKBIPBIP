@@ -23,8 +23,6 @@ class Server(private val port : Int) {
         NotStarted, Starting, Started, Ending, Ended
     }
 
-    private val exitCmd = "exit"
-    private val byeMsg = "bye" + System.lineSeparator()
     private val semaphore = AsyncSemaphore(5)
     @Volatile
     private var status = Status.NotStarted
@@ -32,7 +30,6 @@ class Server(private val port : Int) {
     private var nextClientId = 0
     private val logger = KotlinLogging.logger {}
     private val rooms = RoomSet()
-    private var currentRoom : Room ? = null
 
     private class ServerScope {
 
@@ -42,6 +39,7 @@ class Server(private val port : Int) {
 
         val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + handler)
     }
+
 
     private val group =
         AsynchronousChannelGroup.withThreadPool(Executors.newSingleThreadExecutor())
@@ -55,6 +53,8 @@ class Server(private val port : Int) {
         val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
         status = Status.Started
 
+
+
         while (status == Status.Started) {
             try {
                 logger.info("Waiting for client")
@@ -63,14 +63,6 @@ class Server(private val port : Int) {
                 val clientChannel = accept(serverChannel)
                 logger.info("client ${clientChannel.remoteAddress} connected")
                 val client = ConnectedClient(clientName, clientChannel , rooms)
-                scope.launch {
-                    logger.info("ConnectedClient readLoop initialization")
-                    client.remoteReadLoop()
-                }
-                scope.launch {
-                    logger.info("ConnectedClient mainLoop initialization")
-                    client.mainLoop()
-                }
                 logger.info("client ${clientChannel.remoteAddress} connected")
                 clients.add(client)
             } catch (e: Exception) {
@@ -79,12 +71,14 @@ class Server(private val port : Int) {
         }
         logger.info("Waiting for clients to end, before ending accept loop");
         clients.forEach { client ->
-            client.exit();
-            client.join();
+            client.exit()
+            client.join()
+            nextClientId--
         }
 
         logger.info("Accept thread ending");
         status = Status.Ended;
+        stop()
     }
 
     fun start() {
@@ -111,32 +105,15 @@ class Server(private val port : Int) {
         }
     }
 
-    fun stop() {
-        if (status == Status.NotStarted) {
-            throw Exception("Server has not started")
+    private fun stop() {
+        if (status != Status.Ended) {
+            throw Exception("Server can't stop, status = $status")
         }
         serverChannel.close()
         sleep(1000)
         group.shutdown()
         group.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
     }
-
-    /* TODO :
-    fun join() {
-        if (status == Status.NotStarted)
-        {
-            logger.info("Server has not started");
-            throw Exception("Server has not started");
-        }
-        // FIXME what if it is starting?
-        if (acceptThread == null)
-        {
-            logger.LogError("Unexpected state: acceptThread is not set");
-            throw new Exception("Unexpected state");
-        }
-        _acceptThread.Join();
-    }*/
-
 }
 
 

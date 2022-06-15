@@ -1,13 +1,12 @@
 package isel.leic.pc.coroutines4.servers
 
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import mu.KotlinLogging
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 
 private abstract class ControlMessage {
@@ -20,7 +19,7 @@ private abstract class ControlMessage {
 
 class ConnectedClient(
     val name: String,
-    val clientChannel: AsynchronousSocketChannel,
+    private val clientChannel: AsynchronousSocketChannel,
     val rooms: RoomSet
 ) {
 
@@ -29,25 +28,36 @@ class ConnectedClient(
     private var exiting : Boolean = false
     private val logger = KotlinLogging.logger {}
     private var currentRoom : Room ? = null
-    @Volatile
-    private var currentMessageNumber : Int = 0
-    private val controlMessageQueue : ConcurrentHashMap<Int, ControlMessage> = ConcurrentHashMap()
+    private val controlMessageQueue = NodeList<ControlMessage>()
+    private val clientScope = CoroutineScope(Dispatchers.IO)
     private val lock = ReentrantLock()
+
+
+    init {
+        clientScope.launch {
+            remoteReadLoop()
+        }
+        clientScope.launch {
+            mainLoop()
+        }
+    }
+
     suspend fun mainLoop() {
         while (!exiting) {
-            try {
-                //todo: if control message is empty -> delay
-                var controlMessage = controlMessageQueue[currentMessageNumber--]
-                when (controlMessage) {
-                    is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
-                    is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
-                    is ControlMessage.RemoteInputEnded -> clientExit()
-                    is ControlMessage.Stop -> serverExit()
-                    else -> logger.info("Unknown message ${controlMessage}, ignoring it")
+            if (!controlMessageQueue.isEmpty) {
+                try {
+                    var controlMessage = controlMessageQueue.removeFirst().value
+                    when (controlMessage) {
+                        is ControlMessage.RoomMessage -> writeToRemote((controlMessage as ControlMessage.RoomMessage).Value)
+                        is ControlMessage.RemoteLine -> executeCommand((controlMessage as ControlMessage.RemoteLine).Value)
+                        is ControlMessage.RemoteInputEnded -> clientExit()
+                        is ControlMessage.Stop -> serverExit()
+                        else -> logger.info("Unknown message ${controlMessage}, ignoring it")
+                    }
+                } catch (e: Exception) {
+                    logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
+                    exiting = true
                 }
-            } catch (e: Exception) {
-                logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
-                exiting = true
             }
         }
     }
@@ -57,20 +67,20 @@ class ConnectedClient(
             while (!exiting) {
                 var line = read(clientChannel)
                 print(line)
-                controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteLine(line))
+                controlMessageQueue.add(ControlMessage.RemoteLine(line))
             }
         } catch (e: Exception) {
             // Unexpected exception, log and exit
             logger.info("Exception while waiting for connection read: ${e.message}")
         } finally {
             if (!exiting) {
-                controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.RemoteInputEnded())
+                controlMessageQueue.add(ControlMessage.RemoteInputEnded())
             }
         }
         logger.info("Exiting ReadLoop")
     }
     suspend fun postRoomMessage(formattedMessage: String, room: Room) {
-        if (currentRoom != null) {
+        if (currentRoom == null) {
             write(clientChannel, "Need to be inside a room to post a message")
         } else {
             currentRoom!!.post(this, formattedMessage)
@@ -86,12 +96,12 @@ class ConnectedClient(
     }
 
     fun exit() {
-        controlMessageQueue.putIfAbsent(currentMessageNumber++, ControlMessage.Stop())
+        controlMessageQueue.add(ControlMessage.Stop())
     }
 
     // Synchronizes with the client termination
     fun join() {
-
+        clientScope.cancel()
     }
 
     private suspend fun writeToRemote(line: String) {
