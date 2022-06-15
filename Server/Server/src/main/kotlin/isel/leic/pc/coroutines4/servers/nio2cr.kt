@@ -100,17 +100,17 @@ suspend fun accept(listener : AsynchronousServerSocketChannel):
 suspend fun read(clientChannel : AsynchronousSocketChannel) : String {
     val buffer = ByteBuffer.allocate(1024)
     read(clientChannel, buffer)
-    return withContext(Dispatchers.IO) {
-        decoder.decode(buffer)
+    val res = withContext(Dispatchers.IO) {
+        decoder.decode(buffer.flip())
     }.toString().trim()
+    logger.info("stop here")
+    return res
 }
 
 suspend fun write(clientChannel : AsynchronousSocketChannel, text : String) {
     val buffer = CharBuffer.allocate(1024)
-    buffer.put(text + "\r\n")
-    buffer.flip()
     val byteBuffer = withContext(Dispatchers.IO) {
-        encoder.encode(buffer)
+        encoder.encode(buffer.put(text + "\r\n").flip())
     }
     write(clientChannel, byteBuffer)
 }

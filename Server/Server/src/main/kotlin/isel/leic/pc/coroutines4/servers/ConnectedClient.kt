@@ -11,7 +11,7 @@ import kotlin.concurrent.withLock
 
 private abstract class ControlMessage {
 
-    class RoomMessage(val Sender: Room, val Value: String) : ControlMessage()
+    class RoomMessage(val Value: String, val Sender: Room) : ControlMessage()
     class RemoteLine(val Value: String) : ControlMessage()
     class RemoteInputEnded : ControlMessage()
     class Stop : ControlMessage()
@@ -42,14 +42,14 @@ class ConnectedClient(
         }
     }
 
-    suspend fun mainLoop() {
+    private suspend fun mainLoop() {
         while (!exiting) {
             if (!controlMessageQueue.isEmpty) {
                 try {
                     var controlMessage = controlMessageQueue.removeFirst().value
                     when (controlMessage) {
-                        is ControlMessage.RoomMessage -> writeToRemote((controlMessage as ControlMessage.RoomMessage).Value)
-                        is ControlMessage.RemoteLine -> executeCommand((controlMessage as ControlMessage.RemoteLine).Value)
+                        is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
+                        is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
                         is ControlMessage.RemoteInputEnded -> clientExit()
                         is ControlMessage.Stop -> serverExit()
                         else -> logger.info("Unknown message ${controlMessage}, ignoring it")
@@ -62,7 +62,7 @@ class ConnectedClient(
         }
     }
 
-    suspend fun remoteReadLoop() {
+    private suspend fun remoteReadLoop() {
         try {
             while (!exiting) {
                 var line = read(clientChannel)
@@ -79,12 +79,16 @@ class ConnectedClient(
         }
         logger.info("Exiting ReadLoop")
     }
-    suspend fun postRoomMessage(formattedMessage: String, room: Room) {
-        if (currentRoom == null) {
-            write(clientChannel, "Need to be inside a room to post a message")
-        } else {
-            currentRoom!!.post(this, formattedMessage)
-        }
+    fun postRoomMessage(message: String, sender: Room) {
+        controlMessageQueue.add(ControlMessage.RoomMessage(message, sender))
+    }
+    fun exit() {
+        controlMessageQueue.add(ControlMessage.Stop())
+    }
+
+    // Synchronizes with the client termination
+    fun join() {
+        clientScope.cancel()
     }
 
     private suspend fun postMessageToRoom(message: String) {
@@ -93,15 +97,6 @@ class ConnectedClient(
         } else {
             currentRoom?.post(this, message)
         }
-    }
-
-    fun exit() {
-        controlMessageQueue.add(ControlMessage.Stop())
-    }
-
-    // Synchronizes with the client termination
-    fun join() {
-        clientScope.cancel()
     }
 
     private suspend fun writeToRemote(line: String) {

@@ -7,7 +7,7 @@
     <list default="true" id="3652fc40-f256-4da8-aa0d-be603b422871" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Server.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Server.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -115,11 +115,22 @@
       <workItem from="1655030631122" duration="14924000" />
       <workItem from="1655136041643" duration="5897000" />
       <workItem from="1655196207537" duration="5100000" />
-      <workItem from="1655283607787" duration="6300000" />
+      <workItem from="1655283607787" duration="8645000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt</url>
+          <line>105</line>
+          <option name="timeStamp" value="25" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
