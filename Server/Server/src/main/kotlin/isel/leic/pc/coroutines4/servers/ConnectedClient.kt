@@ -42,6 +42,9 @@ class ConnectedClient(
         }
     }
 
+    /**
+     * TODO: resolve racing
+     */
     private suspend fun mainLoop() {
         while (!exiting) {
             if (!controlMessageQueue.isEmpty) {
@@ -61,7 +64,9 @@ class ConnectedClient(
             }
         }
     }
-
+    /**
+     * TODO: resolve racing
+     */
     private suspend fun remoteReadLoop() {
         try {
             while (!exiting) {
@@ -78,9 +83,15 @@ class ConnectedClient(
         }
         logger.info("Exiting ReadLoop")
     }
+    /**
+     * TODO: resolve racing
+     */
     fun postRoomMessage(message: String, sender: Room) {
         controlMessageQueue.add(ControlMessage.RoomMessage(message, sender))
     }
+    /**
+     * TODO: resolve racing
+     */
     fun exit() {
         controlMessageQueue.add(ControlMessage.Stop())
     }
