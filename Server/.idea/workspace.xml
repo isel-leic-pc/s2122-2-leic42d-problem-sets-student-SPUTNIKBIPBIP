@@ -115,7 +115,7 @@
       <workItem from="1655030631122" duration="14924000" />
       <workItem from="1655136041643" duration="5897000" />
       <workItem from="1655196207537" duration="5100000" />
-      <workItem from="1655283607787" duration="8645000" />
+      <workItem from="1655283607787" duration="10545000" />
     </task>
     <servers />
   </component>
@@ -125,10 +125,15 @@
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
-        <line-breakpoint enabled="true" type="kotlin-line">
+        <line-breakpoint type="kotlin-line">
           <url>file://$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt</url>
-          <line>105</line>
-          <option name="timeStamp" value="25" />
+          <line>103</line>
+          <option name="timeStamp" value="26" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt</url>
+          <line>113</line>
+          <option name="timeStamp" value="29" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

@@ -71,7 +71,6 @@ suspend fun read(channel: AsynchronousSocketChannel, buffer: ByteBuffer): Int {
             channel.close()
         }
         channel.read(buffer, cont, readHandler)
-        logger.info("breakpoint")
     }
 }
 
@@ -81,7 +80,6 @@ suspend fun write(channel : AsynchronousSocketChannel, buffer: ByteBuffer): Int 
         cont.invokeOnCancellation {
             channel.close()
         }
-
         channel.write(buffer, cont, writeHandler)
     }
 }
@@ -101,8 +99,8 @@ suspend fun read(clientChannel : AsynchronousSocketChannel) : String {
     val buffer = ByteBuffer.allocate(1024)
     read(clientChannel, buffer)
     val res = withContext(Dispatchers.IO) {
-        decoder.decode(buffer.flip())
-    }.toString().trim()
+        decoder.decode(buffer).flip()
+    }.toString()
     logger.info("stop here")
     return res
 }

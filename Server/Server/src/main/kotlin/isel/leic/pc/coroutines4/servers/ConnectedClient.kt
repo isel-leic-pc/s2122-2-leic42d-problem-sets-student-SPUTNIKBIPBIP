@@ -20,7 +20,7 @@ private abstract class ControlMessage {
 class ConnectedClient(
     val name: String,
     private val clientChannel: AsynchronousSocketChannel,
-    val rooms: RoomSet
+    private val rooms: RoomSet
 ) {
 
 
@@ -66,7 +66,6 @@ class ConnectedClient(
         try {
             while (!exiting) {
                 var line = read(clientChannel)
-                print(line)
                 controlMessageQueue.add(ControlMessage.RemoteLine(line))
             }
         } catch (e: Exception) {
