@@ -4,9 +4,9 @@ package isel.leic.pc.coroutines4.servers
 import kotlinx.coroutines.*
 import mu.KotlinLogging
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
+import java.util.concurrent.BlockingQueue as ConcurrentBlockingQueue
 
 
 private abstract class ControlMessage {
@@ -28,17 +28,18 @@ class ConnectedClient(
     private var exiting : Boolean = false
     private val logger = KotlinLogging.logger {}
     private var currentRoom : Room ? = null
-    private val controlMessageQueue = NodeList<ControlMessage>()
+    private val controlMessageQueue : ConcurrentBlockingQueue<ControlMessage> = LinkedBlockingQueue()
     private val clientScope = CoroutineScope(Dispatchers.IO)
     private val lock = ReentrantLock()
+    private val condition = lock.newCondition()
 
 
     init {
         clientScope.launch {
-            remoteReadLoop()
+            mainLoop()
         }
         clientScope.launch {
-            mainLoop()
+            remoteReadLoop()
         }
     }
 
@@ -47,20 +48,20 @@ class ConnectedClient(
      */
     private suspend fun mainLoop() {
         while (!exiting) {
-            if (!controlMessageQueue.isEmpty) {
-                try {
-                    var controlMessage = controlMessageQueue.removeFirst().value
-                    when (controlMessage) {
-                        is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
-                        is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
-                        is ControlMessage.RemoteInputEnded -> clientExit()
-                        is ControlMessage.Stop -> serverExit()
-                        else -> logger.info("Unknown message ${controlMessage}, ignoring it")
-                    }
-                } catch (e: Exception) {
-                    logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
-                    exiting = true
+            try {
+                val controlMessage = withContext(Dispatchers.IO) {
+                    controlMessageQueue.take()
                 }
+                when (controlMessage) {
+                    is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
+                    is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
+                    is ControlMessage.RemoteInputEnded -> clientExit()
+                    is ControlMessage.Stop -> serverExit()
+                    else -> logger.info("Unknown message ${controlMessage}, ignoring it")
+                }
+            } catch (e: Exception) {
+                logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
+                exiting = true
             }
         }
     }
@@ -70,7 +71,8 @@ class ConnectedClient(
     private suspend fun remoteReadLoop() {
         try {
             while (!exiting) {
-                var line = read(clientChannel)
+                val line = read(clientChannel)
+                if (line.isEmpty()) break
                 controlMessageQueue.add(ControlMessage.RemoteLine(line))
             }
         } catch (e: Exception) {

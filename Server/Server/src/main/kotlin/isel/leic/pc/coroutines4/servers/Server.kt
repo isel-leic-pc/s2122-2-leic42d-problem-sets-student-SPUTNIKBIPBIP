@@ -8,6 +8,7 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.charset.Charset
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -48,29 +49,26 @@ class Server(private val port : Int) {
     // The parent scope to handler coroutines
     private val scope = ServerScope().scope
 
+
     private suspend fun acceptLoop(serverChannel : AsynchronousServerSocketChannel) {
         logger.info("Accept thread started")
-        val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
+        val clients = ConcurrentHashMap<Int, ConnectedClient>()
         status = Status.Started
-
-
-
         while (status == Status.Started) {
             try {
                 logger.info("Waiting for client")
                 val clientName = "client-${nextClientId++}"
-                logger.info("New client accepted $clientName")
                 val clientChannel = accept(serverChannel)
-                logger.info("client ${clientChannel.remoteAddress} connected")
+                logger.info("New client accepted $clientName")
                 val client = ConnectedClient(clientName, clientChannel , rooms)
                 logger.info("client ${clientChannel.remoteAddress} connected")
-                clients.add(client)
+                clients.putIfAbsent(nextClientId, client)
             } catch (e: Exception) {
                 logger.info("Exception caught ${e.message}, which may happen when the listener is closed, continuing...")
             }
         }
         logger.info("Waiting for clients to end, before ending accept loop");
-        clients.forEach { client ->
+        clients.forEach { (number, client) ->
             client.exit()
             client.join()
             nextClientId--

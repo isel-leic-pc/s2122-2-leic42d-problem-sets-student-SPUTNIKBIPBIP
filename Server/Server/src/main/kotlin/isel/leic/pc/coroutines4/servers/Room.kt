@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class Room(name : String) {
 
+    //TODO: Usar métodos computeIfAbsent
     private val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
 
     fun enter(client : ConnectedClient) {
