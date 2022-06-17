@@ -5,21 +5,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
+import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
+import java.nio.channels.InterruptedByTimeoutException
 import java.nio.charset.Charset
+import java.util.concurrent.CancellationException
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.random.Random
 
 private val random = Random.Default
-private val logger = KotlinLogging.logger {}
+private val logger = LoggerFactory.getLogger("NIO")
 private val charSet = Charset.defaultCharset()
-private val decoder = charSet.newDecoder()
-private val encoder = charSet.newEncoder()
+private val encoder = Charsets.UTF_8.newEncoder()
+private val decoder = Charsets.UTF_8.newDecoder()
 
 
 /**
@@ -95,20 +99,34 @@ suspend fun accept(listener : AsynchronousServerSocketChannel):
     }
 }
 
-suspend fun read(clientChannel : AsynchronousSocketChannel) : String {
-    val buffer = ByteBuffer.allocate(256)
-    buffer.flip()
-    read(clientChannel, buffer)
-    val res = decoder.decode(buffer).flip().toString()
-    logger.info(res)
-    return res
-
+suspend fun AsynchronousSocketChannel.write(text: String): Int {
+    return suspendCancellableCoroutine { continuation ->
+        val toSend = CharBuffer.wrap(text + "\r\n")
+        write(encoder.encode(toSend), continuation, writeHandler)
+    }
 }
 
-suspend fun write(clientChannel : AsynchronousSocketChannel, text : String) {
-    val buffer = CharBuffer.allocate(256)
-    val byteBuffer = encoder.encode(buffer.put(text + "\r\n") )
-    byteBuffer.flip()
-    write(clientChannel, byteBuffer)
-}
+suspend fun AsynchronousSocketChannel.read(timeout: Long = 0, unit: TimeUnit = TimeUnit.MILLISECONDS): String? {
+    return suspendCancellableCoroutine { continuation ->
+        val buffer = ByteBuffer.allocate(1024)
+        read(buffer, timeout, unit, null, object : CompletionHandler<Int, Any?> {
+            override fun completed(result: Int, attachment: Any?) {
+                if (continuation.isCancelled)
+                    continuation.resumeWithException(CancellationException())
+                else {
+                    val received = decoder.decode(buffer.flip()).toString().trim()
+                    continuation.resume(received)
+                }
+            }
 
+            override fun failed(error: Throwable, attachment: Any?) {
+                if (error is InterruptedByTimeoutException) {
+                    continuation.resume(null)
+                }
+                else {
+                    continuation.resumeWithException(error)
+                }
+            }
+        })
+    }
+}

@@ -2,9 +2,12 @@ package isel.leic.pc.coroutines4.servers
 
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.BlockingQueue as ConcurrentBlockingQueue
 
@@ -26,65 +29,63 @@ class ConnectedClient(
 
 
     private var exiting : Boolean = false
-    private val logger = KotlinLogging.logger {}
+    private val logger = KotlinLogging.logger("ConnectedClient")
     private var currentRoom : Room ? = null
     private val controlMessageQueue : ConcurrentBlockingQueue<ControlMessage> = LinkedBlockingQueue()
     private val clientScope = CoroutineScope(Dispatchers.IO)
-    private val lock = ReentrantLock()
-    private val condition = lock.newCondition()
+    private val lock = Mutex()
+    private lateinit var writeJob: Job
+    private lateinit var readJob: Job
 
 
-    init {
-        clientScope.launch {
-            mainLoop()
-        }
-        clientScope.launch {
-            remoteReadLoop()
+    suspend fun start() {
+        lock.withLock {
+            writeJob = mainLoop()
+            readJob = remoteReadLoop()
         }
     }
-
     /**
      * TODO: resolve racing
      */
-    private suspend fun mainLoop() {
-        while (!exiting) {
-            try {
-                val controlMessage = withContext(Dispatchers.IO) {
-                    controlMessageQueue.take()
+    private suspend fun mainLoop(): Job =
+        clientScope.launch{
+            while (!exiting) {
+                try {
+                    val controlMessage = controlMessageQueue.take()
+                    when (controlMessage) {
+                        is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
+                        is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
+                        is ControlMessage.RemoteInputEnded -> clientExit()
+                        is ControlMessage.Stop -> serverExit()
+                        else -> logger.info("Unknown message ${controlMessage}, ignoring it")
+                    }
+                } catch (e: Exception) {
+                    logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
+                    exiting = true
                 }
-                when (controlMessage) {
-                    is ControlMessage.RoomMessage -> writeToRemote(controlMessage.Value)
-                    is ControlMessage.RemoteLine -> executeCommand(controlMessage.Value)
-                    is ControlMessage.RemoteInputEnded -> clientExit()
-                    is ControlMessage.Stop -> serverExit()
-                    else -> logger.info("Unknown message ${controlMessage}, ignoring it")
+            }
+    }
+    /**
+     * TODO: resolve racing
+     */
+    private suspend fun remoteReadLoop(): Job =
+        clientScope.launch{
+            try {
+                while (!exiting) {
+                    val line = clientChannel.read(5, TimeUnit.MINUTES)
+                    if (line!!.isEmpty()) break
+                    controlMessageQueue.add(ControlMessage.RemoteLine(line))
                 }
             } catch (e: Exception) {
-                logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
-                exiting = true
+                // Unexpected exception, log and exit
+                logger.info("Exception while waiting for connection read: ${e.message}")
+            } finally {
+                if (!exiting) {
+                    controlMessageQueue.add(ControlMessage.RemoteInputEnded())
+                }
             }
+            logger.info("Exiting ReadLoop")
         }
-    }
-    /**
-     * TODO: resolve racing
-     */
-    private suspend fun remoteReadLoop() {
-        try {
-            while (!exiting) {
-                val line = read(clientChannel)
-                if (line.isEmpty()) break
-                controlMessageQueue.add(ControlMessage.RemoteLine(line))
-            }
-        } catch (e: Exception) {
-            // Unexpected exception, log and exit
-            logger.info("Exception while waiting for connection read: ${e.message}")
-        } finally {
-            if (!exiting) {
-                controlMessageQueue.add(ControlMessage.RemoteInputEnded())
-            }
-        }
-        logger.info("Exiting ReadLoop")
-    }
     /**
      * TODO: resolve racing
      */
@@ -99,20 +100,21 @@ class ConnectedClient(
     }
 
     // Synchronizes with the client termination
-    fun join() {
-        clientScope.cancel()
+    suspend fun join() {
+        readJob.join()
+        writeJob.join()
     }
 
     private suspend fun postMessageToRoom(message: String) {
         if (currentRoom == null) {
-            write(clientChannel, "Need to be inside a room to post a message")
+            clientChannel.write("Need to be inside a room to post a message")
         } else {
             currentRoom?.post(this, message)
         }
     }
 
     private suspend fun writeToRemote(line: String) {
-        write(clientChannel, line)
+        clientChannel.write(line)
     }
     private suspend fun writeErrorToRemote(line: String) {
         writeToRemote("[Error: ${line}]")

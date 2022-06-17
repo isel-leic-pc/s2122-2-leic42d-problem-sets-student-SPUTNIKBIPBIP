@@ -14,7 +14,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 
-private val logger = KotlinLogging.logger {}
+private val logger = KotlinLogging.logger("Server")
 private val charSet = Charset.defaultCharset()
 private val decoder = charSet.newDecoder()
 
@@ -24,7 +24,6 @@ class Server(private val port : Int) {
         NotStarted, Starting, Started, Ending, Ended
     }
 
-    private val semaphore = AsyncSemaphore(5)
     @Volatile
     private var status = Status.NotStarted
     @Volatile
@@ -61,6 +60,7 @@ class Server(private val port : Int) {
                 val clientChannel = accept(serverChannel)
                 logger.info("New client accepted $clientName")
                 val client = ConnectedClient(clientName, clientChannel , rooms)
+                client.start()
                 logger.info("client ${clientChannel.remoteAddress} connected")
                 clients.putIfAbsent(nextClientId, client)
             } catch (e: Exception) {
