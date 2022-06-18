@@ -1,10 +1,7 @@
 package isel.leic.pc.coroutines4.servers
 
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
@@ -55,7 +52,7 @@ class ConnectedClient(
      */
     private suspend fun mainLoop(): Job =
         clientScope.launch{
-            while (true) {
+            while (state == State.STARTED) {
                 try {
                     val controlMessage = controlMessageQueue.take()
                     when (controlMessage) {
@@ -70,13 +67,11 @@ class ConnectedClient(
                 }
             }
     }
-    /**
-     * TODO: resolve racing
-     */
+
     private suspend fun remoteReadLoop(): Job =
         clientScope.launch{
             try {
-                while (true) {
+                while (state == State.STARTED) {
                     val line = clientChannel.read(5, TimeUnit.MINUTES)
                     if (line!!.isEmpty()) break
                     controlMessageQueue.add(ControlMessage.RemoteLine(line))
@@ -91,23 +86,13 @@ class ConnectedClient(
             }
             logger.info("Exiting ReadLoop")
         }
-    /**
-     * TODO: resolve racing
-     */
+
     fun postRoomMessage(message: String, sender: Room) {
         controlMessageQueue.add(ControlMessage.RoomMessage(message, sender))
     }
-    /**
-     * TODO: resolve racing
-     */
+
     fun exit() {
         controlMessageQueue.add(ControlMessage.Stop())
-    }
-
-    // Synchronizes with the client termination
-    suspend fun join() {
-        readJob.join()
-        writeJob.join()
     }
 
     private suspend fun postMessageToRoom(message: String) {
@@ -136,6 +121,7 @@ class ConnectedClient(
             is Line.EnterRoomCommand -> enterRoom(line.name)
             is Line.LeaveRoomCommand -> leaveRoom()
             is Line.ExitCommand -> clientExit()
+            is Line.ShutdownCommand -> serverShutdown(line.timeout)
             else -> writeErrorToRemote("unable to process line")
         }
     }
@@ -159,7 +145,6 @@ class ConnectedClient(
     }
 
     //TODO: check for future problems
-    //TODO: client decrement isnt made in server!!!!!
     private suspend fun clientExit() {
         lock.withLock {
             if (state != State.STARTED)
@@ -167,8 +152,9 @@ class ConnectedClient(
             state = State.STOPPED
         }
         currentRoom?.leave(this)
-        readJob.cancel()
+        readJob.cancelAndJoin()
         writeOkToRemote()
+        writeJob.cancelAndJoin()
         closeConnection(clientChannel)
     }
 
@@ -176,7 +162,10 @@ class ConnectedClient(
         currentRoom?.leave(this);
         writeErrorToRemote("Server is exiting")
         clientExit()
-        join()
+    }
+
+    private suspend fun serverShutdown(timeout : Long = 2) {
+        Server.nofityServerTermination(timeout)
     }
 
 }

@@ -53,7 +53,7 @@ open class Line {
 
         private fun parseShutdown(parts: List<String>): Line {
             return if (parts.size != 2) {
-                InvalidLine("/exit command does not have arguments")
+                InvalidLine("/shutdown must have a timeout param")
             } else ShutdownCommand(parts[1].toLong())
         }
     }

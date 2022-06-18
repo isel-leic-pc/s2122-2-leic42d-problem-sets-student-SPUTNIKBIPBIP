@@ -4,21 +4,16 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
-import java.lang.Thread.sleep
 import java.net.InetSocketAddress
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
-import java.nio.channels.AsynchronousSocketChannel
-import java.nio.charset.Charset
-import java.util.concurrent.BlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 
 private val logger = KotlinLogging.logger("Server")
-private val charSet = Charset.defaultCharset()
-private val decoder = charSet.newDecoder()
 
 class Server(private val port : Int) {
 
@@ -26,14 +21,34 @@ class Server(private val port : Int) {
         NotStarted, Starting, Started, Ending, Ended
     }
 
-    @Volatile
     private var status = Status.NotStarted
-    @Volatile
-    private var nextClientId = 0
+    private var nextClientId = AtomicInteger(0)
     private val logger = KotlinLogging.logger {}
     private val rooms = RoomSet()
     private val lock = Mutex()
     private lateinit var loopJob: Job
+    val clients = ConcurrentHashMap<Int, ConnectedClient>()
+
+
+    companion object Notifier {
+
+        private lateinit var server : Server
+        private val lock = Mutex()
+
+        suspend fun nofityServerTermination(timeout: Long) {
+            lock.withLock {
+                if (server.status != Status.Started) {
+                    throw Exception("Server has not been started yet")
+                }
+                server.status = Status.Ending
+            }
+            server.stopServer(timeout)
+        }
+    }
+
+    init {
+        server = this
+    }
 
     private class ServerScope {
 
@@ -55,43 +70,46 @@ class Server(private val port : Int) {
 
     private suspend fun acceptLoop(serverChannel : AsynchronousServerSocketChannel) {
         logger.info("Accept thread started")
-        val clients = ConcurrentHashMap<Int, ConnectedClient>()
-        status = Status.Started
+        lock.withLock {
+            if (status != Status.Starting) {
+                throw Exception("Server isn't starting")
+            }
+            status = Status.Started
+        }
         while (status == Status.Started) {
             try {
                 logger.info("Waiting for client")
-                val clientName = "client-${nextClientId++}"
+                val clientName = "client-${nextClientId.getAndIncrement()}"
                 val clientChannel = accept(serverChannel)
                 logger.info("New client accepted $clientName")
                 val client = ConnectedClient(clientName, clientChannel , rooms)
                 client.start()
                 logger.info("client ${clientChannel.remoteAddress} connected")
-                clients.putIfAbsent(nextClientId, client)
+                clients.putIfAbsent(nextClientId.get(), client)
             } catch (e: Exception) {
                 logger.info("Exception caught ${e.message}, which may happen when the listener is closed, continuing...")
             }
         }
-        logger.info("Waiting for clients to end, before ending accept loop");
-        clients.forEach { (number, client) ->
-            client.exit()
-            client.join()
-            nextClientId--
+        lock.withLock {
+            if (status != Status.Started) {
+                throw Exception("Server isn't running")
+            }
+            status = Status.Ending;
         }
-
-        logger.info("Accept thread ending");
-        status = Status.Ended;
-        stop()
+        stopServer(2)
     }
 
-    fun start() {
+    suspend fun start() {
         suspend fun run() {
             acceptLoop(serverChannel)
         }
-
-        if (status != Status.NotStarted) {
-            throw Exception("Server has already started")
+        lock.withLock {
+            if (status != Status.NotStarted) {
+                throw Exception("Server has already started")
+            }
+            status = Status.Starting
         }
-        status = Status.Starting
+
         serverChannel.bind(InetSocketAddress("0.0.0.0", port))
 
         loopJob = scope.launch {
@@ -107,22 +125,27 @@ class Server(private val port : Int) {
         }
     }
 
-    private suspend fun stop() {
+    private suspend fun stopServer(timeout : Long = 5) {
+        logger.info("Waiting for clients to end, before ending accept loop");
+        clients.forEach { (_, client) ->
+            client.exit()
+        }
+        logger.info("Accept thread ending");
         lock.withLock {
-            if (status != Status.Ended) {
+            if (status != Status.Ending) {
                 throw Exception("Server can't stop, status = $status")
             }
-            status = Status.Ending
+            status = Status.Ended
         }
-        serverChannel.close()
         loopJob.cancelAndJoin()
+        serverChannel.close()
         group.shutdown()
-        group.awaitTermination(0, TimeUnit.MILLISECONDS)
+        group.awaitTermination(timeout, TimeUnit.MILLISECONDS)
     }
 }
 
 
-private fun main() {
+private suspend fun main() {
     val server = Server(8080)
     server.start()
     readLine()
