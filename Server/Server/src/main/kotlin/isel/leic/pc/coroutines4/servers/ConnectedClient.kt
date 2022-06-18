@@ -36,12 +36,16 @@ class ConnectedClient(
     private val lock = Mutex()
     private lateinit var writeJob: Job
     private lateinit var readJob: Job
-
+    private enum class State { NOT_STARTED, STARTED, STOPPED }
+    private var state = State.NOT_STARTED
 
     suspend fun start() {
         lock.withLock {
+            if (state != State.NOT_STARTED)
+                throw IllegalStateException("Client is already connected")
             writeJob = mainLoop()
             readJob = remoteReadLoop()
+            state = State.STARTED
         }
     }
     /**
@@ -49,7 +53,7 @@ class ConnectedClient(
      */
     private suspend fun mainLoop(): Job =
         clientScope.launch{
-            while (!exiting) {
+            while (true) {
                 try {
                     val controlMessage = controlMessageQueue.take()
                     when (controlMessage) {
@@ -61,7 +65,6 @@ class ConnectedClient(
                     }
                 } catch (e: Exception) {
                     logger.info("Unexpected exception while handling message: ${e.message}, ending connection")
-                    exiting = true
                 }
             }
     }
@@ -71,7 +74,7 @@ class ConnectedClient(
     private suspend fun remoteReadLoop(): Job =
         clientScope.launch{
             try {
-                while (!exiting) {
+                while (true) {
                     val line = clientChannel.read(5, TimeUnit.MINUTES)
                     if (line!!.isEmpty()) break
                     controlMessageQueue.add(ControlMessage.RemoteLine(line))
@@ -153,16 +156,25 @@ class ConnectedClient(
         }
     }
 
+    //TODO: check for future problems
+    //TODO: client decrement isnt made in server!!!!!
     private suspend fun clientExit() {
+        lock.withLock {
+            if (state != State.STARTED)
+                throw IllegalStateException("Client session hasn't started yet")
+            state = State.STOPPED
+        }
         currentRoom?.leave(this)
-        exiting = true
+        readJob.cancel()
         writeOkToRemote()
+        closeConnection(clientChannel)
     }
 
     private suspend fun serverExit() {
         currentRoom?.leave(this);
-        exiting = true;
-        writeErrorToRemote("Server is exiting");
+        writeErrorToRemote("Server is exiting")
+        clientExit()
+        join()
     }
 
 }

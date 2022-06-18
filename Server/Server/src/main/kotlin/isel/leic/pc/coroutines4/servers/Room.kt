@@ -1,11 +1,10 @@
 package isel.leic.pc.coroutines4.servers
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class Room(name : String) {
 
-    //TODO: Usar métodos computeIfAbsent
-    private val clients = ConcurrentHashMap.newKeySet<ConnectedClient>()
+    private val clients = ConcurrentLinkedQueue<ConnectedClient>()
 
     fun enter(client : ConnectedClient) {
         clients.add(client)
@@ -15,8 +14,8 @@ class Room(name : String) {
         clients.remove(client)
     }
 
-    suspend fun post(client: ConnectedClient, message: String) {
-        val formattedMessage  = "Name: ${client.name} says ${message}"
+    fun post(client: ConnectedClient, message: String) {
+        val formattedMessage  = "Name: ${client.name} says $message"
         clients.forEach { receiver ->
             if (receiver != client)
                 receiver.postRoomMessage(formattedMessage, this)

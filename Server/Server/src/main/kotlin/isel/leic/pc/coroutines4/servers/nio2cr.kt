@@ -1,10 +1,7 @@
 package isel.leic.pc.coroutines4.servers
 
 import kotlinx.coroutines.CancellableContinuation
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
-import mu.KotlinLogging
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -12,7 +9,6 @@ import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.nio.channels.InterruptedByTimeoutException
-import java.nio.charset.Charset
 import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -21,7 +17,6 @@ import kotlin.random.Random
 
 private val random = Random.Default
 private val logger = LoggerFactory.getLogger("NIO")
-private val charSet = Charset.defaultCharset()
 private val encoder = Charsets.UTF_8.newEncoder()
 private val decoder = Charsets.UTF_8.newDecoder()
 

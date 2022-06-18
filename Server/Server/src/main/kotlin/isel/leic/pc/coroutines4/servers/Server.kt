@@ -1,6 +1,8 @@
 package isel.leic.pc.coroutines4.servers
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
 import java.lang.Thread.sleep
 import java.net.InetSocketAddress
@@ -30,6 +32,8 @@ class Server(private val port : Int) {
     private var nextClientId = 0
     private val logger = KotlinLogging.logger {}
     private val rooms = RoomSet()
+    private val lock = Mutex()
+    private lateinit var loopJob: Job
 
     private class ServerScope {
 
@@ -90,7 +94,7 @@ class Server(private val port : Int) {
         status = Status.Starting
         serverChannel.bind(InetSocketAddress("0.0.0.0", port))
 
-        scope.launch {
+        loopJob = scope.launch {
             try {
                 run()
             }
@@ -103,14 +107,17 @@ class Server(private val port : Int) {
         }
     }
 
-    private fun stop() {
-        if (status != Status.Ended) {
-            throw Exception("Server can't stop, status = $status")
+    private suspend fun stop() {
+        lock.withLock {
+            if (status != Status.Ended) {
+                throw Exception("Server can't stop, status = $status")
+            }
+            status = Status.Ending
         }
         serverChannel.close()
-        sleep(1000)
+        loopJob.cancelAndJoin()
         group.shutdown()
-        group.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+        group.awaitTermination(0, TimeUnit.MILLISECONDS)
     }
 }
 
