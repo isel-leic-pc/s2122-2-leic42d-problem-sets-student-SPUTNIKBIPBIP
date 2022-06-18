@@ -47,9 +47,7 @@ class ConnectedClient(
             state = State.STARTED
         }
     }
-    /**
-     * TODO: resolve racing
-     */
+
     private suspend fun mainLoop(): Job =
         clientScope.launch{
             while (state == State.STARTED) {
@@ -144,7 +142,6 @@ class ConnectedClient(
         }
     }
 
-    //TODO: check for future problems
     private suspend fun clientExit() {
         lock.withLock {
             if (state != State.STARTED)
