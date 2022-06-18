@@ -7,12 +7,8 @@
     <list default="true" id="3652fc40-f256-4da8-aa0d-be603b422871" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/NodeList.kt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Room.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Room.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/RoomSet.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/RoomSet.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Server.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Server.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/nio2cr.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/utils.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -128,11 +124,27 @@
       <workItem from="1655476357126" duration="627000" />
       <workItem from="1655494907999" duration="7688000" />
       <workItem from="1655502866780" duration="1998000" />
-      <workItem from="1655545871613" duration="3981000" />
+      <workItem from="1655545871613" duration="6941000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint type="kotlin-line">
+          <url>file://$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/ConnectedClient.kt</url>
+          <line>145</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint type="kotlin-line">
+          <url>file://$PROJECT_DIR$/Server/src/main/kotlin/isel/leic/pc/coroutines4/servers/Line.kt</url>
+          <line>22</line>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

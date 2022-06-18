@@ -2,10 +2,9 @@ package isel.leic.pc.coroutines4.servers
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-class Room(name : String) {
+class Room(val name : String) {
 
     private val clients = ConcurrentLinkedQueue<ConnectedClient>()
-
     fun enter(client : ConnectedClient) {
         clients.add(client)
     }
